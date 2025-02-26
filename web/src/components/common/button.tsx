@@ -1,15 +1,19 @@
 interface props {
     children?: React.ReactNode
-    act?: boolean
+    act?: string
     onClick?: () => void
 }
 
-function Button({ children, act = true, onClick }: props) {
+function Button({ children, act = "blue", onClick }: props) {
     return (
         <button
             onClick={onClick}
             className={`w-full h-9 rounded-md ${
-                act ? " bg-blue-500" : " bg-slate-400"
+                act == "blue"
+                    ? " bg-blue-500"
+                    : act == "critical"
+                    ? " bg-red-500"
+                    : " bg-slate-400"
             } text-white font-bold`}
         >
             {children}

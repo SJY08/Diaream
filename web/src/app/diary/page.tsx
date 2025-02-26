@@ -4,91 +4,41 @@ import { useState, useEffect } from "react"
 import Button from "@/components/common/button"
 import Header from "@/components/common/header"
 import Diary_component from "@/components/diary/diary"
-import Modal from "@/components/common/modal"
-import Input from "@/components/common/input"
+import NightService from "@/api/nights"
+import { SleepLog } from "@/api/nights/type"
+import { EditModal, WriteModal } from "@/components/diary/modal"
 
 function Diary() {
     const [modal, setModal] = useState<boolean>(false)
-    const dummy = [
-        {
-            title: "title1",
-            content:
-                "content1content1content1content1content1content1content1content1content1content1content1content1content1",
-            date: "2025-02-19",
-            sleep: "22:00",
-            wake: "11:00",
-        },
-        {
-            title: "title2",
-            content:
-                "content2content2content2content2content2content2content2content2",
-            date: "2025-02-18",
-            sleep: "23:00",
-            wake: "13:00",
-        },
-        {
-            title: "title1",
-            content:
-                "content1content1content1content1content1content1content1content1content1content1content1content1content1",
-            date: "2025-02-19",
-            sleep: "22:00",
-            wake: "11:00",
-        },
-        {
-            title: "title2",
-            content:
-                "content2content2content2content2content2content2content2content2",
-            date: "2025-02-18",
-            sleep: "23:00",
-            wake: "13:00",
-        },
-        {
-            title: "title1",
-            content:
-                "content1content1content1content1content1content1content1content1content1content1content1content1content1",
-            date: "2025-02-19",
-            sleep: "22:00",
-            wake: "11:00",
-        },
-        {
-            title: "title2",
-            content:
-                "content2content2content2content2content2content2content2content2",
-            date: "2025-02-18",
-            sleep: "23:00",
-            wake: "13:00",
-        },
-        {
-            title: "title1",
-            content:
-                "content1content1content1content1content1content1content1content1content1content1content1content1content1",
-            date: "2025-02-19",
-            sleep: "22:00",
-            wake: "11:00",
-        },
-        {
-            title: "title2",
-            content:
-                "content2content2content2content2content2content2content2content2",
-            date: "2025-02-18",
-            sleep: "23:00",
-            wake: "13:00",
-        },
-    ]
+    const [diaryList, setDiaryList] = useState<SleepLog[]>([])
+    const [selectedDiary, setSelectedDiary] = useState<SleepLog | null>(null)
+    const [edit, setEdit] = useState<boolean>(false)
+
+    const handleSelectLog = (log: SleepLog) => {
+        setSelectedDiary(log)
+        setEdit(true)
+    }
+
+    const fetchDiaries = async () => {
+        const data = await NightService.get()
+        setDiaryList(data)
+    }
+
+    useEffect(() => {
+        fetchDiaries()
+    }, [])
 
     return (
         <>
             <Header />
-            {modal && (
-                <Modal setFunc={setModal}>
-                    <div className="w-full flex flex-col gap-2">
-                        <Input label="제목" />
-                        <Input type="time" label="잠든 시간" />
-                        <Input type="time" label="일어난 시간" />
-                        <Input size="big" label="일지" />
-                    </div>
-                </Modal>
+            {edit && selectedDiary && (
+                <EditModal
+                    setFunc={setEdit}
+                    diary={selectedDiary}
+                    refresh={fetchDiaries}
+                />
             )}
+            {modal && <WriteModal setFunc={setModal} />}
             <div className="relative top-12 w-full flex flex-col items-center">
                 <div className="w-1/2">
                     <div className="flex mt-6">
@@ -107,7 +57,7 @@ function Diary() {
                     </div>
 
                     <div className="mt-6 flex flex-col gap-1">
-                        {dummy.map((v, i) => (
+                        {diaryList.map((v, i) => (
                             <Diary_component
                                 key={i}
                                 title={v.title}
@@ -115,6 +65,9 @@ function Diary() {
                                 date={v.date}
                                 sleep={v.sleep}
                                 wake={v.wake}
+                                onClick={() => {
+                                    handleSelectLog(v)
+                                }}
                             />
                         ))}
                     </div>

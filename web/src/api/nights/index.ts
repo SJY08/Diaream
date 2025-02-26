@@ -57,11 +57,22 @@ export default class NightService {
     // ✅ 수면 통계 조회
     static async getStat(): Promise<SleepStatistics[]> {
         try {
-            const response = await instance.get("/nights/statistics")
+            const response = await instance.get("/nights/daily-statistics")
             return response.data
         } catch (error: unknown) {
             console.error("통계 조회 실패:", error)
             return []
+        }
+    }
+
+    static async delete(nightid: number): Promise<number> {
+        try {
+            const response = await instance.delete(`/nights/delete/${nightid}`)
+            return response.status
+        } catch (error: unknown) {
+            if (error instanceof AxiosError)
+                return error.response?.status ?? 500
+            return 500
         }
     }
 }
