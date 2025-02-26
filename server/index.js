@@ -235,14 +235,54 @@ app.post("/nights/write", verifyToken, async (req, res) => {
     const { title, content, date, sleep, wake } = req.body
 
     try {
-        await db.query(
-            "INSERT INTO sleep_logs (user_id, title, content, date, sleep, wake) VALUES (?, ?, ?, ?, ?, ?)",
-            [user_id, title, content, date, sleep, wake]
+        // 자정 보정 (wake < sleep이면 wake에 1일 추가)
+        const [durationResult] = await db.query(
+            `SELECT TIMESTAMPDIFF(
+                MINUTE, 
+                ?, 
+                IF(? < ?, ? + INTERVAL 1 DAY, ?)
+            ) AS sleep_duration`,
+            [sleep, wake, sleep, wake, wake]
         )
-        res.status(201).json({ message: "저장 완료" })
+        const sleep_duration = durationResult[0].sleep_duration // 결과에서 값 추출
+
+        await db.query(
+            "INSERT INTO sleep_logs (user_id, title, content, date, sleep, wake, sleep_duration) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            [user_id, title, content, date, sleep, wake, sleep_duration]
+        )
+
+        res.status(201).json({ message: "저장 완료", sleep_duration })
     } catch (err) {
         console.error("수면일지 작성 오류:", err)
         res.status(500).json({ message: "저장 실패" })
+    }
+})
+
+// 수면일지 수정
+app.put("/nights/update/:nightid", verifyToken, async (req, res) => {
+    const { title, content, date, sleep, wake } = req.body
+    const nightid = req.params.nightid
+
+    try {
+        const [durationResult] = await db.query(
+            `SELECT TIMESTAMPDIFF(
+                MINUTE, 
+                ?, 
+                IF(? < ?, ? + INTERVAL 1 DAY, ?)
+            ) AS sleep_duration`,
+            [sleep, wake, sleep, wake, wake]
+        )
+        const sleep_duration = durationResult[0].sleep_duration
+
+        await db.query(
+            "UPDATE sleep_logs SET title=?, content=?, date=?, sleep=?, wake=?, sleep_duration=? WHERE nightid=?",
+            [title, content, date, sleep, wake, sleep_duration, nightid]
+        )
+
+        res.json({ message: "수정 완료", sleep_duration })
+    } catch (err) {
+        console.error("수면일지 수정 오류:", err)
+        res.status(500).json({ message: "수정 실패" })
     }
 })
 
@@ -264,15 +304,36 @@ app.get("/nights/get", verifyToken, async (req, res) => {
 
 // 수면일지 수정
 app.put("/nights/update/:nightid", verifyToken, async (req, res) => {
-    const { title, content, date, sleep, wake } = req.body
+    const { title, content, sleep, wake } = req.body
     const nightid = req.params.nightid
 
     try {
-        await db.query(
-            "UPDATE sleep_logs SET title=?, content=?, date=?, sleep=?, wake=? WHERE nightid=?",
-            [title, content, date, sleep, wake, nightid]
+        // 기존 'date' 값을 조회
+        const [existingRecord] = await db.query(
+            "SELECT date FROM sleep_logs WHERE nightid = ?",
+            [nightid]
         )
-        res.json({ message: "수정 완료" })
+
+        const existingDate = existingRecord[0]?.date
+        if (!existingDate) {
+            return res
+                .status(404)
+                .json({ message: "해당 수면일지 날짜를 찾을 수 없습니다" })
+        }
+
+        const [durationResult] = await db.query(
+            "SELECT TIMESTAMPDIFF(MINUTE, ?, ?) AS sleep_duration",
+            [sleep, wake]
+        )
+        const sleep_duration = durationResult[0].sleep_duration
+
+        // 'date' 값을 기존 값으로 설정하여 업데이트
+        await db.query(
+            "UPDATE sleep_logs SET title=?, content=?, date=?, sleep=?, wake=?, sleep_duration=? WHERE nightid=?",
+            [title, content, existingDate, sleep, wake, sleep_duration, nightid]
+        )
+
+        res.json({ message: "수정 완료", sleep_duration })
     } catch (err) {
         console.error("수면일지 수정 오류:", err)
         res.status(500).json({ message: "수정 실패" })
@@ -280,22 +341,40 @@ app.put("/nights/update/:nightid", verifyToken, async (req, res) => {
 })
 
 // 전체 유저의 수면 통계 조회
-app.get("/nights/statistics", async (req, res) => {
+// 전체 유저의 수면 통계 조회 (매일 기준)
+app.get("/nights/daily-statistics", async (req, res) => {
     try {
         const [results] = await db.query(
             `SELECT 
-                users.id AS user_id, 
-                users.name, 
-                COUNT(sleep_logs.id) AS sleep_count, 
-                AVG(TIMESTAMPDIFF(HOUR, sleep_logs.sleep, sleep_logs.wake)) AS avg_sleep_hours
+                sleep_logs.date AS sleep_date, 
+                ROUND(AVG(sleep_logs.sleep_duration) / 60, 2) AS avg_sleep_hours
             FROM sleep_logs 
-            JOIN users ON sleep_logs.user_id = users.id
-            GROUP BY users.id, users.name
-            ORDER BY avg_sleep_hours DESC`
+            GROUP BY sleep_logs.date
+            ORDER BY sleep_date DESC`
         )
         res.json(results)
     } catch (err) {
         console.error("수면 통계 조회 오류:", err)
         res.status(500).json({ message: "통계 조회 실패" })
+    }
+})
+
+app.delete("/nights/delete/:nightid", verifyToken, async (req, res) => {
+    const nightid = req.params.nightid
+
+    try {
+        const [result] = await db.query(
+            "DELETE FROM sleep_logs WHERE nightid = ?",
+            [nightid]
+        )
+
+        if (result.affectedRows == 0)
+            return res
+                .status(404)
+                .json({ message: "해당 수면 일지가 없습니다" })
+        res.json({ message: "삭제완료" })
+    } catch (e) {
+        console.error("수면일지 삭제 오류 :", e)
+        res.status(500).json({ message: "삭제 실패" })
     }
 })
