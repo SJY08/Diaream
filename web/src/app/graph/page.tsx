@@ -50,7 +50,7 @@ function Graph() {
                         <p>이곳에서 수면 그래프를 확인해요!</p>
                     </div>
 
-                    <h3>최근 수면시간 평균은 {avg}시간 이에요 !</h3>
+                    <h3>최근 수면시간 평균은 {avg.toFixed(1)}시간 이에요 !</h3>
 
                     <div>
                         <Graph_component
