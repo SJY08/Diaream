@@ -258,34 +258,6 @@ app.post("/nights/write", verifyToken, async (req, res) => {
     }
 })
 
-// 수면일지 수정
-app.put("/nights/update/:nightid", verifyToken, async (req, res) => {
-    const { title, content, date, sleep, wake } = req.body
-    const nightid = req.params.nightid
-
-    try {
-        const [durationResult] = await db.query(
-            `SELECT TIMESTAMPDIFF(
-                MINUTE, 
-                ?, 
-                IF(? < ?, ? + INTERVAL 1 DAY, ?)
-            ) AS sleep_duration`,
-            [sleep, wake, sleep, wake, wake]
-        )
-        const sleep_duration = durationResult[0].sleep_duration
-
-        await db.query(
-            "UPDATE sleep_logs SET title=?, content=?, date=?, sleep=?, wake=?, sleep_duration=? WHERE nightid=?",
-            [title, content, date, sleep, wake, sleep_duration, nightid]
-        )
-
-        res.json({ message: "수정 완료", sleep_duration })
-    } catch (err) {
-        console.error("수면일지 수정 오류:", err)
-        res.status(500).json({ message: "수정 실패" })
-    }
-})
-
 // 수면일지 조회
 app.get("/nights/get", verifyToken, async (req, res) => {
     const user_id = req.user.id
@@ -340,7 +312,6 @@ app.put("/nights/update/:nightid", verifyToken, async (req, res) => {
     }
 })
 
-// 전체 유저의 수면 통계 조회
 // 전체 유저의 수면 통계 조회 (매일 기준)
 app.get("/nights/daily-statistics", async (req, res) => {
     try {
